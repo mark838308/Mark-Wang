@@ -1,0 +1,1275 @@
+<DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>USD/TWD FX-SW + CCS + SOFR IRS Pro Trader Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root{
+    --bg:#08101d;
+    --panel:#10192b;
+    --panel2:#15213a;
+    --line:#263654;
+    --text:#dce8ff;
+    --muted:#90a7d1;
+    --accent:#4ea1ff;
+    --green:#27c26c;
+    --red:#ff6b6b;
+    --yellow:#f0b34a;
+    --cyan:#36d6c9;
+    --purple:#a78bfa;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:Arial,"Microsoft JhengHei",sans-serif;
+  }
+  .container{
+    max-width:1700px;
+    margin:0 auto;
+    padding:18px;
+  }
+  .title{font-size:28px;font-weight:700}
+  .subtitle{color:var(--muted);margin:6px 0 18px}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .tab-btn{
+    width:auto;padding:10px 16px;border-radius:10px;
+    border:1px solid var(--line);background:var(--panel);color:var(--text);
+    cursor:pointer
+  }
+  .tab-btn.active{background:#1b2b49;border-color:var(--accent)}
+  .tab-content{display:none}
+  .tab-content.active{display:block}
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px;
+    margin-bottom:16px;
+    box-shadow:0 6px 24px rgba(0,0,0,0.25);
+  }
+  .panel h2,.panel h3{margin:0 0 12px}
+  .grid{display:grid;gap:14px}
+  .grid-2{grid-template-columns:1fr 1fr}
+  .grid-3{grid-template-columns:repeat(3,1fr)}
+  .grid-4{grid-template-columns:repeat(4,1fr)}
+  .grid-5{grid-template-columns:repeat(5,1fr)}
+  .grid-6{grid-template-columns:repeat(6,1fr)}
+  label{
+    display:block;font-size:12px;color:var(--muted);margin-bottom:6px
+  }
+  input,select,button{
+    width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);outline:none
+  }
+  input:focus,select:focus{border-color:var(--accent)}
+  button{
+    cursor:pointer;
+    background:linear-gradient(135deg,#2563eb,#1d9bf0);
+    border:none;font-weight:700
+  }
+  button.secondary{
+    background:#203150;border:1px solid #355184
+  }
+  table{
+    width:100%;border-collapse:collapse;font-size:13px
+  }
+  th,td{
+    border-bottom:1px solid var(--line);
+    padding:9px 8px;text-align:right;white-space:nowrap
+  }
+  th{
+    text-align:right;background:#0d1525;color:#bfd1f3;position:sticky;top:0
+  }
+  td:first-child,th:first-child{text-align:left}
+  .table-wrap{overflow:auto}
+  .metrics{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:12px
+  }
+  .metric{
+    background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px
+  }
+  .metric .k{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .metric .v{font-size:22px;font-weight:700}
+  .green{color:var(--green)}
+  .red{color:var(--red)}
+  .yellow{color:var(--yellow)}
+  .cyan{color:var(--cyan)}
+  .purple{color:var(--purple)}
+  .badge{
+    display:inline-block;padding:3px 8px;border-radius:999px;
+    font-size:11px;border:1px solid #34558d;background:#193056;color:#b5d2ff
+  }
+  .small{font-size:12px;color:var(--muted)}
+  .pill{
+    display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px
+  }
+  .pill.buy{background:#10381f;color:#8ef0b5;border:1px solid #1f6b3a}
+  .pill.sell{background:#431a1a;color:#ffb4b4;border:1px solid #7d3131}
+  .warn{background:rgba(240,179,74,0.12)}
+  .danger{background:rgba(255,107,107,0.12)}
+  canvas{background:#0d1525;border:1px solid var(--line);border-radius:12px;padding:10px}
+  @media (max-width: 1200px){
+    .grid-6,.grid-5,.grid-4,.grid-3,.grid-2,.metrics{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="title">USD/TWD FX-SW + USD/TWD CCS + USD SOFR IRS Pro Trader Dashboard</div>
+  <div class="subtitle">Bid/Ask market grid, CIP implied funding, CCS basis, charts, blotter, MTM and risk monitor</div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="tab-dashboard">Market Dashboard</button>
+    <button class="tab-btn" data-tab="tab-fxsw">FX-SW</button>
+    <button class="tab-btn" data-tab="tab-irs">SOFR IRS</button>
+    <button class="tab-btn" data-tab="tab-ccs">USD/TWD CCS</button>
+    <button class="tab-btn" data-tab="tab-blotter">Blotter</button>
+    <button class="tab-btn" data-tab="tab-risk">Risk</button>
+  </div>
+
+  <div id="tab-dashboard" class="tab-content active">
+    <div class="panel">
+      <h2>Global Setup</h2>
+      <div class="grid grid-6">
+        <div>
+          <label>Trade Date</label>
+          <input type="date" id="tradeDate" />
+        </div>
+        <div>
+          <label>Spot Lag</label>
+          <input type="number" id="spotLag" value="2" />
+        </div>
+        <div>
+          <label>USD Basis</label>
+          <select id="usdBasis">
+            <option value="360">ACT/360</option>
+            <option value="365">ACT/365</option>
+          </select>
+        </div>
+        <div>
+          <label>TWD Basis</label>
+          <select id="twdBasis">
+            <option value="365">ACT/365</option>
+            <option value="360">ACT/360</option>
+          </select>
+        </div>
+        <div>
+          <label>USD/TWD Spot</label>
+          <input type="number" id="spot" value="32.097" step="0.000001" />
+        </div>
+        <div>
+          <label>Point Scale</label>
+          <input type="number" id="pointScale" value="1" step="0.01" />
+        </div>
+      </div>
+      <div class="grid grid-4" style="margin-top:14px">
+        <div>
+          <label>Default USD Notional</label>
+          <input type="number" id="defaultNotional" value="10000000" step="1000" />
+        </div>
+        <div>
+          <label>Base TWD Ref Rate (%)</label>
+          <input type="number" id="baseTwdRef" value="1.00" step="0.0001" />
+        </div>
+        <div>
+          <label>Apply Point Scale to FX Quotes</label>
+          <select id="applyScaleGlobal">
+            <option value="false">No</option>
+            <option value="true">Yes</option>
+          </select>
+        </div>
+        <div>
+          <label>Spot Date</label>
+          <input type="text" id="spotDateLabel" readonly />
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <button onclick="recalcAll()">Recalculate Market</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Bid / Ask Market Grid <span class="badge">3M / 6M / 9M / 1Y / 2Y</span></h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Tenor</th>
+              <th>Maturity</th>
+              <th>USD SOFR Bid %</th>
+              <th>USD SOFR Mid %</th>
+              <th>USD SOFR Ask %</th>
+              <th>FX Pts Bid</th>
+              <th>FX Pts Mid</th>
+              <th>FX Pts Ask</th>
+              <th>FX Width</th>
+              <th>Manual TWD %</th>
+              <th>Use Manual</th>
+              <th>CCS Basis Bid bp</th>
+              <th>CCS Basis Mid bp</th>
+              <th>CCS Basis Ask bp</th>
+              <th>Implied TWD Mid %</th>
+              <th>TWD Used %</th>
+              <th>Model Pts</th>
+              <th>Dislocation bp</th>
+            </tr>
+          </thead>
+          <tbody id="marketGridBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Market Summary</h2>
+      <div class="metrics">
+        <div class="metric">
+          <div class="k">1Y Mid Forward</div>
+          <div class="v" id="sum1">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">1Y Implied TWD Mid</div>
+          <div class="v cyan" id="sum2">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">2Y CCS Mid Basis</div>
+          <div class="v purple" id="sum3">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">Largest Dislocation</div>
+          <div class="v yellow" id="sum4">-</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-3">
+      <div class="panel">
+        <h3>FX Swap Points Curve</h3>
+        <canvas id="chartFxPts"></canvas>
+      </div>
+      <div class="panel">
+        <h3>Implied TWD Curve</h3>
+        <canvas id="chartTwd"></canvas>
+      </div>
+      <div class="panel">
+        <h3>CCS Basis Curve</h3>
+        <canvas id="chartBasis"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-fxsw" class="tab-content">
+    <div class="panel">
+      <h2>FX-SW Calculator</h2>
+      <div class="grid grid-4">
+        <div>
+          <label>Tenor</label>
+          <select id="fxTenor"></select>
+        </div>
+        <div>
+          <label>Solve For</label>
+          <select id="fxMode">
+            <option>TWD Implied Rate</option>
+            <option>USD Implied Rate</option>
+            <option>Swap Points</option>
+          </select>
+        </div>
+        <div>
+          <label>Spot</label>
+          <input type="number" id="fxSpot" value="32.097" step="0.000001" />
+        </div>
+        <div>
+          <label>FX Points</label>
+          <input type="number" id="fxPts" value="-0.357" step="0.000001" />
+        </div>
+      </div>
+      <div class="grid grid-3" style="margin-top:14px">
+        <div>
+          <label>USD Rate (%)</label>
+          <input type="number" id="fxUsdRate" value="3.17" step="0.0001" />
+        </div>
+        <div>
+          <label>TWD Rate (%)</label>
+          <input type="number" id="fxTwdRate" value="1.00" step="0.0001" />
+        </div>
+        <div>
+          <label>Apply Scale</label>
+          <select id="fxApplyScale">
+            <option value="false">No</option>
+            <option value="true">Yes</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <button onclick="calcFXSW()">Calculate FX-SW</button>
+      </div>
+      <div class="metrics" style="margin-top:14px">
+        <div class="metric">
+          <div class="k">Forward</div>
+          <div class="v" id="fxRes1">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">Result</div>
+          <div class="v cyan" id="fxRes2">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">Maturity</div>
+          <div class="v" id="fxRes3">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">YearFrac USD / TWD</div>
+          <div class="v yellow" id="fxRes4">-</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-irs" class="tab-content">
+    <div class="panel">
+      <h2>USD SOFR IRS Pricer</h2>
+      <div class="grid grid-4">
+        <div>
+          <label>USD Notional</label>
+          <input type="number" id="irsNotional" value="10000000" step="1000" />
+        </div>
+        <div>
+          <label>Tenor</label>
+          <select id="irsTenor"></select>
+        </div>
+        <div>
+          <label>Trade Fixed Rate (%)</label>
+          <input type="number" id="irsTradeRate" value="3.17" step="0.0001" />
+        </div>
+        <div>
+          <label>Market Par Rate (%)</label>
+          <input type="number" id="irsMktRate" value="3.17" step="0.0001" />
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <button onclick="calcIRS()">Calculate IRS</button>
+      </div>
+      <div class="metrics" style="margin-top:14px">
+        <div class="metric">
+          <div class="k">End Date</div>
+          <div class="v" id="irsRes1">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">Payer Fixed NPV (USD)</div>
+          <div class="v" id="irsRes2">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">Rate Diff (bp)</div>
+          <div class="v yellow" id="irsRes3">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">End DF</div>
+          <div class="v cyan" id="irsRes4">-</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-ccs" class="tab-content">
+    <div class="panel">
+      <h2>USD/TWD CCS Pricer</h2>
+      <div class="grid grid-4">
+        <div>
+          <label>USD Notional</label>
+          <input type="number" id="ccsNotional" value="10000000" step="1000" />
+        </div>
+        <div>
+          <label>Tenor</label>
+          <select id="ccsTenor"></select>
+        </div>
+        <div>
+          <label>Pay Freq (months)</label>
+          <select id="ccsPayFreq">
+            <option>3</option>
+            <option>6</option>
+            <option>12</option>
+          </select>
+        </div>
+        <div>
+          <label>Report CCY</label>
+          <select id="ccsReportCcy">
+            <option>TWD</option>
+            <option>USD</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-4" style="margin-top:14px">
+        <div>
+          <label>USD Leg Type</label>
+          <select id="ccsUsdLegType">
+            <option>FLOAT</option>
+            <option>FIXED</option>
+          </select>
+        </div>
+        <div>
+          <label>USD Leg Spread / Rate (%)</label>
+          <input type="number" id="ccsUsdLegRate" value="0.00" step="0.0001" />
+        </div>
+        <div>
+          <label>TWD Leg Type</label>
+          <select id="ccsTwdLegType">
+            <option>FLOAT</option>
+            <option>FIXED</option>
+          </select>
+        </div>
+        <div>
+          <label>TWD Leg Spread / Rate (%)</label>
+          <input type="number" id="ccsTwdLegRate" value="0.00" step="0.0001" />
+        </div>
+      </div>
+      <div class="grid grid-3" style="margin-top:14px">
+        <div>
+          <label>CCS Spot</label>
+          <input type="number" id="ccsSpot" value="32.097" step="0.000001" />
+        </div>
+        <div>
+          <label>TWD Base Ref (%)</label>
+          <input type="number" id="ccsTwdBase" value="1.00" step="0.0001" />
+        </div>
+        <div>
+          <label>Solve Par Basis</label>
+          <select id="ccsSolvePar">
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <button onclick="calcCCS()">Calculate CCS</button>
+      </div>
+      <div class="metrics" style="margin-top:14px">
+        <div class="metric">
+          <div class="k">End Date</div>
+          <div class="v" id="ccsRes1">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">Par Basis (bp)</div>
+          <div class="v purple" id="ccsRes2">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">CCS NPV</div>
+          <div class="v" id="ccsRes3">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">TWD Notional</div>
+          <div class="v yellow" id="ccsRes4">-</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-blotter" class="tab-content">
+    <div class="panel">
+      <h2>Trade Blotter</h2>
+      <div class="grid grid-6">
+        <div>
+          <label>Product</label>
+          <select id="blProduct">
+            <option>FXSW</option>
+            <option>IRS</option>
+            <option>CCS</option>
+          </select>
+        </div>
+        <div>
+          <label>Side</label>
+          <select id="blSide">
+            <option>BUY</option>
+            <option>SELL</option>
+          </select>
+        </div>
+        <div>
+          <label>Tenor</label>
+          <select id="blTenor"></select>
+        </div>
+        <div>
+          <label>Notional (USD)</label>
+          <input type="number" id="blNotional" value="10000000" step="1000" />
+        </div>
+        <div>
+          <label>Trade Rate / Points / Basis</label>
+          <input type="number" id="blTradeLevel" value="-0.357" step="0.000001" />
+        </div>
+        <div>
+          <label>Trade Spot</label>
+          <input type="number" id="blSpot" value="32.097" step="0.000001" />
+        </div>
+      </div>
+      <div style="margin-top:14px" class="grid grid-4">
+        <div>
+          <button onclick="addTrade()">Add Trade</button>
+        </div>
+        <div>
+          <button class="secondary" onclick="clearTrades()">Clear Blotter</button>
+        </div>
+        <div>
+          <button class="secondary" onclick="repriceBlotter()">Reprice Blotter</button>
+        </div>
+        <div>
+          <button class="secondary" onclick="seedDemoTrades()">Load Demo Trades</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Blotter Summary</h2>
+      <div class="metrics">
+        <div class="metric">
+          <div class="k">Total Trades</div>
+          <div class="v" id="blSum1">0</div>
+        </div>
+        <div class="metric">
+          <div class="k">FXSW MTM (TWD)</div>
+          <div class="v cyan" id="blSum2">0</div>
+        </div>
+        <div class="metric">
+          <div class="k">IRS MTM (USD)</div>
+          <div class="v purple" id="blSum3">0</div>
+        </div>
+        <div class="metric">
+          <div class="k">CCS MTM</div>
+          <div class="v yellow" id="blSum4">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Trade List</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Product</th>
+              <th>Side</th>
+              <th>Tenor</th>
+              <th>USD Notional</th>
+              <th>Trade Level</th>
+              <th>Current Level</th>
+              <th>Trade Spot</th>
+              <th>Current Spot</th>
+              <th>MTM</th>
+              <th>CCY</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="blotterBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-risk" class="tab-content">
+    <div class="panel">
+      <h2>Risk / PnL</h2>
+      <div class="grid grid-4">
+        <div>
+          <label>FXSW USD Notional</label>
+          <input type="number" id="riskFxNotional" value="10000000" step="1000" />
+        </div>
+        <div>
+          <label>Traded Points</label>
+          <input type="number" id="riskTradedPts" value="-0.357" step="0.000001" />
+        </div>
+        <div>
+          <label>Current Market Points</label>
+          <input type="number" id="riskMktPts" value="-0.300" step="0.000001" />
+        </div>
+        <div>
+          <label>CCS Risk Tenor</label>
+          <select id="riskTenor"></select>
+        </div>
+      </div>
+      <div class="grid grid-3" style="margin-top:14px">
+        <div>
+          <label>USD Curve Shock (bp)</label>
+          <input type="number" id="riskUsdShock" value="1" step="0.01" />
+        </div>
+        <div>
+          <label>TWD Curve Shock (bp)</label>
+          <input type="number" id="riskTwdShock" value="1" step="0.01" />
+        </div>
+        <div>
+          <label>Run</label>
+          <button onclick="calcRisk()">Calculate Risk</button>
+        </div>
+      </div>
+      <div class="metrics" style="margin-top:14px">
+        <div class="metric">
+          <div class="k">FXSW PnL (TWD)</div>
+          <div class="v" id="risk1">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">Base CCS NPV (TWD)</div>
+          <div class="v cyan" id="risk2">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">Shocked CCS NPV (TWD)</div>
+          <div class="v purple" id="risk3">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">Delta (TWD)</div>
+          <div class="v yellow" id="risk4">-</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="small">
+    說明：本工具為交易桌原型與試算版，SOFR IRS / CCS 為簡化模型，適合相對價值與日常試算，不應直接取代正式清算或會計估值系統。
+  </div>
+</div>
+
+<script>
+const TENORS = ["3M","6M","9M","1Y","2Y"];
+let fxPtsChart, twdChart, basisChart;
+let blotter = [];
+
+function setDefaultDate(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  document.getElementById("tradeDate").value = `${y}-${m}-${day}`;
+}
+function populateTenors(){
+  ["fxTenor","irsTenor","ccsTenor","blTenor","riskTenor"].forEach(id=>{
+    const el = document.getElementById(id);
+    el.innerHTML = "";
+    TENORS.forEach(t=>{
+      const op = document.createElement("option");
+      op.value = t;
+      op.textContent = t;
+      if((id==="fxTenor"||id==="irsTenor") && t==="1Y") op.selected = true;
+      if((id==="ccsTenor"||id==="riskTenor") && t==="2Y") op.selected = true;
+      el.appendChild(op);
+    });
+  });
+}
+function num(id){ return Number(document.getElementById(id).value); }
+function val(id){ return document.getElementById(id).value; }
+function fmt(x,n=6){
+  if(!isFinite(x)) return "-";
+  return Number(x).toLocaleString(undefined,{minimumFractionDigits:n,maximumFractionDigits:n});
+}
+function fmt2(x,n=2){
+  if(!isFinite(x)) return "-";
+  return Number(x).toLocaleString(undefined,{minimumFractionDigits:n,maximumFractionDigits:n});
+}
+function parseDate(id){ return new Date(document.getElementById(id).value+"T00:00:00"); }
+function formatDate(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const da = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${da}`;
+}
+function isBusinessDay(d){
+  const wd = d.getDay();
+  return wd !== 0 && wd !== 6;
+}
+function addBusinessDays(d,n){
+  const x = new Date(d);
+  let rem = n;
+  while(rem>0){
+    x.setDate(x.getDate()+1);
+    if(isBusinessDay(x)) rem--;
+  }
+  return x;
+}
+function adjustModifiedFollowing(d){
+  const x = new Date(d);
+  const originalMonth = x.getMonth();
+  while(!isBusinessDay(x)){ x.setDate(x.getDate()+1); }
+  if(x.getMonth() !== originalMonth){
+    const y = new Date(d);
+    while(!isBusinessDay(y)){ y.setDate(y.getDate()-1); }
+    return y;
+  }
+  return x;
+}
+function addTenor(start, tenor){
+  const x = new Date(start);
+  if(tenor.endsWith("M")){
+    x.setMonth(x.getMonth()+parseInt(tenor));
+  } else {
+    x.setFullYear(x.getFullYear()+parseInt(tenor));
+  }
+  return adjustModifiedFollowing(x);
+}
+function daysBetween(d1,d2){
+  return Math.round((d2-d1)/(1000*60*60*24));
+}
+function yearFrac(d1,d2,basis){
+  return daysBetween(d1,d2)/Number(basis);
+}
+function getSpotDate(){
+  return addBusinessDays(parseDate("tradeDate"), num("spotLag"));
+}
+
+/* =========================
+   FX-SW / CIP CORE
+   修正處：USD/TWD 正確方向
+   F = S * (1 + rTWD * tTWD) / (1 + rUSD * tUSD)
+   ========================= */
+function forwardFromRates(spot, usdRate, twdRate, tUsd, tTwd){
+  return spot * (1 + twdRate * tTwd) / (1 + usdRate * tUsd);
+}
+function twdImpliedRate(spot, forward, usdRate, tUsd, tTwd){
+  return (((forward / spot) * (1 + usdRate * tUsd)) - 1) / tTwd;
+}
+function usdImpliedRate(spot, forward, twdRate, tUsd, tTwd){
+  return (((1 + twdRate * tTwd) / (forward / spot)) - 1) / tUsd;
+}
+function fxswapPnlTwd(notional, tradedPts, mktPts, side){
+  const sign = side === "BUY" ? 1 : -1;
+  return sign * notional * (mktPts - tradedPts);
+}
+
+function dfSimple(rate, t){
+  return 1 / (1 + rate * t);
+}
+function buildSchedule(start, end, freqM){
+  let dates = [new Date(start)];
+  let cur = new Date(start);
+  while(true){
+    const nxt = new Date(cur);
+    nxt.setMonth(nxt.getMonth()+Number(freqM));
+    const adj = adjustModifiedFollowing(nxt);
+    if(adj >= end) break;
+    dates.push(adj);
+    cur = adj;
+  }
+  dates.push(new Date(end));
+  return dates;
+}
+function irsFixedLegPv(notional, fixedRate, schedule, curveRate, basis){
+  const start = schedule[0];
+  let pv = 0;
+  for(let i=1;i<schedule.length;i++){
+    const accrual = yearFrac(schedule[i-1], schedule[i], basis);
+    const t = yearFrac(start, schedule[i], basis);
+    pv += notional * fixedRate * accrual * dfSimple(curveRate, t);
+  }
+  return pv;
+}
+function irsFloatLegPvPar(notional, start, end, curveRate, basis){
+  const t = yearFrac(start, end, basis);
+  return notional * (1 - dfSimple(curveRate, t));
+}
+function irsNpv(notional, fixedRate, mktRate, start, end, basis, side){
+  const schedule = buildSchedule(start,end,12);
+  const fixedPv = irsFixedLegPv(notional, fixedRate, schedule, mktRate, basis);
+  const floatPv = irsFloatLegPvPar(notional, start, end, mktRate, basis);
+  if(side === "BUY") return fixedPv - floatPv;
+  return floatPv - fixedPv;
+}
+function ccsLegFixedPv(notional, rate, schedule, curveRate, basis){
+  const start = schedule[0];
+  let pv = 0;
+  for(let i=1;i<schedule.length;i++){
+    const accrual = yearFrac(schedule[i-1], schedule[i], basis);
+    const t = yearFrac(start, schedule[i], basis);
+    pv += notional * rate * accrual * dfSimple(curveRate, t);
+  }
+  return pv;
+}
+function ccsLegFloatPv(notional, start, end, curveRate, basis){
+  const t = yearFrac(start, end, basis);
+  return notional * (1 - dfSimple(curveRate, t));
+}
+function ccsPrincipalPv(notional, start, end, curveRate, basis){
+  const t = yearFrac(start,end,basis);
+  return -notional + notional * dfSimple(curveRate, t);
+}
+function ccsNpv(params){
+  const {
+    usdNotional, spot, start, end,
+    usdCurveRate, twdCurveRate,
+    usdLegType, usdLegRate, twdLegType, twdLegRate,
+    payFreq, usdBasis, twdBasis, reportCcy, side
+  } = params;
+
+  const twdNotional = usdNotional * spot;
+  const usdSch = buildSchedule(start,end,payFreq);
+  const twdSch = buildSchedule(start,end,payFreq);
+
+  let usdLeg = 0, twdLeg = 0;
+
+  if(usdLegType === "FLOAT"){
+    usdLeg = ccsLegFloatPv(usdNotional, start, end, usdCurveRate, usdBasis) +
+             ccsLegFixedPv(usdNotional, usdLegRate, usdSch, usdCurveRate, usdBasis);
+  } else {
+    usdLeg = ccsLegFixedPv(usdNotional, usdLegRate, usdSch, usdCurveRate, usdBasis);
+  }
+
+  if(twdLegType === "FLOAT"){
+    twdLeg = ccsLegFloatPv(twdNotional, start, end, twdCurveRate, twdBasis) +
+             ccsLegFixedPv(twdNotional, twdLegRate, twdSch, twdCurveRate, twdBasis);
+  } else {
+    twdLeg = ccsLegFixedPv(twdNotional, twdLegRate, twdSch, twdCurveRate, twdBasis);
+  }
+
+  const usdPv = usdLeg + ccsPrincipalPv(usdNotional, start, end, usdCurveRate, usdBasis);
+  const twdPv = twdLeg + ccsPrincipalPv(twdNotional, start, end, twdCurveRate, twdBasis);
+
+  let npv = reportCcy === "TWD" ? (twdPv - usdPv * spot) : (twdPv / spot - usdPv);
+  if(side === "SELL") npv = -npv;
+  return npv;
+}
+function solveParBasis(params){
+  let low=-0.1, high=0.1, mid=0;
+  for(let i=0;i<100;i++){
+    mid=(low+high)/2;
+    const npv = ccsNpv({...params, twdLegRate: params.twdBaseRate + params.twdLegSpread + mid});
+    if(npv > 0) high=mid; else low=mid;
+  }
+  return mid;
+}
+function setupTabs(){
+  document.querySelectorAll(".tab-btn").forEach(btn=>{
+    btn.onclick = ()=>{
+      document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c=>c.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(btn.dataset.tab).classList.add("active");
+    };
+  });
+}
+function initMarketGrid(){
+  const body = document.getElementById("marketGridBody");
+  body.innerHTML = "";
+  TENORS.forEach(t=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${t}</td>
+      <td id="mat_${t}">-</td>
+      <td><input id="usdBid_${t}" type="number" value="3.15" step="0.0001"></td>
+      <td><input id="usdMid_${t}" type="number" value="3.17" step="0.0001"></td>
+      <td><input id="usdAsk_${t}" type="number" value="3.19" step="0.0001"></td>
+      <td><input id="fxBid_${t}" type="number" value="${t==="1Y" ? "-0.360":"0"}" step="0.000001"></td>
+      <td><input id="fxMid_${t}" type="number" value="${t==="1Y" ? "-0.357":"0"}" step="0.000001"></td>
+      <td><input id="fxAsk_${t}" type="number" value="${t==="1Y" ? "-0.354":"0"}" step="0.000001"></td>
+      <td id="fxWidth_${t}">-</td>
+      <td><input id="twdManual_${t}" type="number" value="1.00" step="0.0001"></td>
+      <td>
+        <select id="useManual_${t}">
+          <option value="false">No</option>
+          <option value="true">Yes</option>
+        </select>
+      </td>
+      <td><input id="basisBid_${t}" type="number" value="-5.00" step="0.0001"></td>
+      <td><input id="basisMid_${t}" type="number" value="0.00" step="0.0001"></td>
+      <td><input id="basisAsk_${t}" type="number" value="5.00" step="0.0001"></td>
+      <td id="impTwd_${t}">-</td>
+      <td id="twdUsed_${t}">-</td>
+      <td id="modelPts_${t}">-</td>
+      <td id="disloc_${t}">-</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+function getMidInputs(tenor){
+  const scale = num("pointScale");
+  const applyScale = val("applyScaleGlobal")==="true";
+  let fxMid = Number(document.getElementById(`fxMid_${tenor}`).value);
+  if(applyScale) fxMid *= scale;
+  return {
+    usdMid: Number(document.getElementById(`usdMid_${tenor}`).value)/100,
+    fxMid,
+    twdManual: Number(document.getElementById(`twdManual_${tenor}`).value)/100,
+    useManual: document.getElementById(`useManual_${tenor}`).value==="true",
+    basisMid: Number(document.getElementById(`basisMid_${tenor}`).value)/10000
+  };
+}
+function getCurveMid(tenor, side){
+  if(side==="USD") return Number(document.getElementById(`usdMid_${tenor}`).value)/100;
+  const spot = num("spot");
+  const spotDate = getSpotDate();
+  const mat = addTenor(spotDate, tenor);
+  const tUsd = yearFrac(spotDate, mat, val("usdBasis"));
+  const tTwd = yearFrac(spotDate, mat, val("twdBasis"));
+  const inp = getMidInputs(tenor);
+  const fwd = spot + inp.fxMid;
+  const implied = twdImpliedRate(spot, fwd, inp.usdMid, tUsd, tTwd);
+  return (inp.useManual ? inp.twdManual : implied) + inp.basisMid;
+}
+function recalcAll(){
+  const spotDate = getSpotDate();
+  document.getElementById("spotDateLabel").value = formatDate(spotDate);
+  const spot = num("spot");
+  let maxDisloc = {tenor:"-", val:0, signed:0};
+
+  const labels = [];
+  const fxMidArr = [];
+  const fxBidArr = [];
+  const fxAskArr = [];
+  const twdImpArr = [];
+  const twdUsedArr = [];
+  const basisMidArr = [];
+
+  TENORS.forEach(t=>{
+    const mat = addTenor(spotDate, t);
+    const tUsd = yearFrac(spotDate, mat, val("usdBasis"));
+    const tTwd = yearFrac(spotDate, mat, val("twdBasis"));
+
+    const usdMid = Number(document.getElementById(`usdMid_${t}`).value)/100;
+    let fxBid = Number(document.getElementById(`fxBid_${t}`).value);
+    let fxMid = Number(document.getElementById(`fxMid_${t}`).value);
+    let fxAsk = Number(document.getElementById(`fxAsk_${t}`).value);
+    if(val("applyScaleGlobal")==="true"){
+      fxBid *= num("pointScale");
+      fxMid *= num("pointScale");
+      fxAsk *= num("pointScale");
+    }
+    const twdManual = Number(document.getElementById(`twdManual_${t}`).value)/100;
+    const useManual = document.getElementById(`useManual_${t}`).value==="true";
+    const basisMid = Number(document.getElementById(`basisMid_${t}`).value)/10000;
+
+    const fwdMid = spot + fxMid;
+    const impliedTwd = twdImpliedRate(spot, fwdMid, usdMid, tUsd, tTwd);
+    const twdUsed = (useManual ? twdManual : impliedTwd) + basisMid;
+    const modelFwd = forwardFromRates(spot, usdMid, twdUsed, tUsd, tTwd);
+    const modelPts = modelFwd - spot;
+    const disloc = (impliedTwd - twdUsed) * 10000;
+    const width = fxAsk - fxBid;
+
+    document.getElementById(`mat_${t}`).textContent = formatDate(mat);
+    document.getElementById(`fxWidth_${t}`).textContent = fmt(width,6);
+    document.getElementById(`impTwd_${t}`).textContent = fmt(impliedTwd*100,6);
+    document.getElementById(`twdUsed_${t}`).textContent = fmt(twdUsed*100,6);
+    document.getElementById(`modelPts_${t}`).textContent = fmt(modelPts,6);
+    document.getElementById(`disloc_${t}`).textContent = fmt(disloc,2);
+
+    const row = document.getElementById(`disloc_${t}`).parentElement;
+    row.classList.remove("warn","danger");
+    if(Math.abs(disloc) > 15) row.classList.add("danger");
+    else if(Math.abs(disloc) > 5) row.classList.add("warn");
+
+    if(Math.abs(disloc) > maxDisloc.val){
+      maxDisloc = {tenor:t, val:Math.abs(disloc), signed:disloc};
+    }
+
+    labels.push(t);
+    fxMidArr.push(fxMid);
+    fxBidArr.push(fxBid);
+    fxAskArr.push(fxAsk);
+    twdImpArr.push(impliedTwd*100);
+    twdUsedArr.push(twdUsed*100);
+    basisMidArr.push(basisMid*10000);
+  });
+
+  const oneY = getMidInputs("1Y");
+  const mat1Y = addTenor(spotDate, "1Y");
+  const fwd1Y = spot + oneY.fxMid;
+  const imp1Y = twdImpliedRate(
+    spot,
+    fwd1Y,
+    oneY.usdMid,
+    yearFrac(spotDate,mat1Y,val("usdBasis")),
+    yearFrac(spotDate,mat1Y,val("twdBasis"))
+  );
+  document.getElementById("sum1").textContent = fmt(fwd1Y,6);
+  document.getElementById("sum2").textContent = fmt(imp1Y*100,6) + "%";
+  document.getElementById("sum3").textContent = fmt(Number(document.getElementById("basisMid_2Y").value),4) + " bp";
+  document.getElementById("sum4").textContent = `${maxDisloc.tenor} / ${fmt(maxDisloc.signed,2)} bp`;
+
+  renderCharts(labels, fxBidArr, fxMidArr, fxAskArr, twdImpArr, twdUsedArr, basisMidArr);
+  repriceBlotter();
+}
+function renderCharts(labels, fxBidArr, fxMidArr, fxAskArr, twdImpArr, twdUsedArr, basisMidArr){
+  if(fxPtsChart) fxPtsChart.destroy();
+  if(twdChart) twdChart.destroy();
+  if(basisChart) basisChart.destroy();
+
+  fxPtsChart = new Chart(document.getElementById("chartFxPts"), {
+    type:"line",
+    data:{
+      labels,
+      datasets:[
+        {label:"Bid", data:fxBidArr, borderColor:"#ff6b6b", backgroundColor:"transparent", tension:0.25},
+        {label:"Mid", data:fxMidArr, borderColor:"#4ea1ff", backgroundColor:"transparent", tension:0.25},
+        {label:"Ask", data:fxAskArr, borderColor:"#36d6c9", backgroundColor:"transparent", tension:0.25}
+      ]
+    },
+    options:{responsive:true, plugins:{legend:{labels:{color:"#dce8ff"}}}, scales:{x:{ticks:{color:"#dce8ff"}}, y:{ticks:{color:"#dce8ff"}}}}
+  });
+
+  twdChart = new Chart(document.getElementById("chartTwd"), {
+    type:"line",
+    data:{
+      labels,
+      datasets:[
+        {label:"Implied TWD %", data:twdImpArr, borderColor:"#f0b34a", backgroundColor:"transparent", tension:0.25},
+        {label:"TWD Used %", data:twdUsedArr, borderColor:"#a78bfa", backgroundColor:"transparent", tension:0.25}
+      ]
+    },
+    options:{responsive:true, plugins:{legend:{labels:{color:"#dce8ff"}}}, scales:{x:{ticks:{color:"#dce8ff"}}, y:{ticks:{color:"#dce8ff"}}}}
+  });
+
+  basisChart = new Chart(document.getElementById("chartBasis"), {
+    type:"bar",
+    data:{
+      labels,
+      datasets:[
+        {label:"CCS Basis Mid (bp)", data:basisMidArr, backgroundColor:"#36d6c9"}
+      ]
+    },
+    options:{responsive:true, plugins:{legend:{labels:{color:"#dce8ff"}}}, scales:{x:{ticks:{color:"#dce8ff"}}, y:{ticks:{color:"#dce8ff"}}}}
+  });
+}
+function calcFXSW(){
+  const spotDate = getSpotDate();
+  const tenor = val("fxTenor");
+  const mat = addTenor(spotDate, tenor);
+  const tUsd = yearFrac(spotDate, mat, val("usdBasis"));
+  const tTwd = yearFrac(spotDate, mat, val("twdBasis"));
+  const spot = num("fxSpot");
+  let pts = num("fxPts");
+  if(val("fxApplyScale")==="true") pts *= num("pointScale");
+  const usd = num("fxUsdRate")/100;
+  const twd = num("fxTwdRate")/100;
+  const fwd = spot + pts;
+  const mode = val("fxMode");
+
+  if(mode==="TWD Implied Rate"){
+    document.getElementById("fxRes1").textContent = fmt(fwd,6);
+    document.getElementById("fxRes2").textContent = fmt(twdImpliedRate(spot,fwd,usd,tUsd,tTwd)*100,6) + "%";
+  } else if(mode==="USD Implied Rate"){
+    document.getElementById("fxRes1").textContent = fmt(fwd,6);
+    document.getElementById("fxRes2").textContent = fmt(usdImpliedRate(spot,fwd,twd,tUsd,tTwd)*100,6) + "%";
+  } else {
+    const modelFwd = forwardFromRates(spot,usd,twd,tUsd,tTwd);
+    document.getElementById("fxRes1").textContent = fmt(modelFwd,6);
+    document.getElementById("fxRes2").textContent = fmt(modelFwd - spot,6);
+  }
+  document.getElementById("fxRes3").textContent = formatDate(mat);
+  document.getElementById("fxRes4").textContent = `${fmt(tUsd,6)} / ${fmt(tTwd,6)}`;
+}
+function calcIRS(){
+  const spotDate = getSpotDate();
+  const tenor = val("irsTenor");
+  const end = addTenor(spotDate, tenor);
+  const notional = num("irsNotional");
+  const tradeRate = num("irsTradeRate")/100;
+  const mktRate = num("irsMktRate")/100;
+  const npv = irsNpv(notional, tradeRate, mktRate, spotDate, end, val("usdBasis"), "SELL");
+  const df = dfSimple(mktRate, yearFrac(spotDate,end,val("usdBasis")));
+
+  document.getElementById("irsRes1").textContent = formatDate(end);
+  document.getElementById("irsRes2").textContent = fmt2(npv,2);
+  document.getElementById("irsRes3").textContent = fmt2((mktRate-tradeRate)*10000,2);
+  document.getElementById("irsRes4").textContent = fmt(df,6);
+}
+function calcCCS(){
+  const spotDate = getSpotDate();
+  const tenor = val("ccsTenor");
+  const end = addTenor(spotDate, tenor);
+  const usdNotional = num("ccsNotional");
+  const spot = num("ccsSpot");
+  const usdCurve = getCurveMid(tenor,"USD");
+  const twdCurve = getCurveMid(tenor,"TWD");
+  const usdLegType = val("ccsUsdLegType");
+  const usdLegRate = num("ccsUsdLegRate")/100;
+  const twdLegType = val("ccsTwdLegType");
+  const twdLegSpread = num("ccsTwdLegRate")/100;
+  const twdBaseRate = num("ccsTwdBase")/100;
+  const payFreq = Number(val("ccsPayFreq"));
+  const reportCcy = val("ccsReportCcy");
+  const solvePar = val("ccsSolvePar")==="true";
+
+  let basis = 0;
+  if(solvePar){
+    basis = solveParBasis({
+      usdNotional, spot, start:spotDate, end,
+      usdCurveRate:usdCurve, twdCurveRate:twdCurve,
+      usdLegType, usdLegRate, twdLegType,
+      twdBaseRate, twdLegSpread,
+      payFreq, usdBasis:val("usdBasis"), twdBasis:val("twdBasis"),
+      reportCcy, side:"BUY"
+    });
+  } else {
+    basis = twdLegSpread;
+  }
+
+  const npv = ccsNpv({
+    usdNotional, spot, start:spotDate, end,
+    usdCurveRate:usdCurve, twdCurveRate:twdCurve,
+    usdLegType, usdLegRate, twdLegType,
+    twdLegRate:twdBaseRate + basis,
+    payFreq, usdBasis:val("usdBasis"), twdBasis:val("twdBasis"),
+    reportCcy, side:"BUY"
+  });
+
+  document.getElementById("ccsRes1").textContent = formatDate(end);
+  document.getElementById("ccsRes2").textContent = fmt(basis*10000,4);
+  document.getElementById("ccsRes3").textContent = `${reportCcy} ${fmt2(npv,2)}`;
+  document.getElementById("ccsRes4").textContent = fmt2(usdNotional*spot,2);
+}
+function getCurrentLevel(product, tenor){
+  if(product==="FXSW"){
+    let v = Number(document.getElementById(`fxMid_${tenor}`).value);
+    if(val("applyScaleGlobal")==="true") v *= num("pointScale");
+    return {level:v, ccy:"TWD"};
+  }
+  if(product==="IRS"){
+    return {level:Number(document.getElementById(`usdMid_${tenor}`).value)/100, ccy:"USD"};
+  }
+  return {level:Number(document.getElementById(`basisMid_${tenor}`).value)/10000, ccy:"TWD"};
+}
+function addTrade(){
+  const rawTradeLevel = Number(document.getElementById("blTradeLevel").value);
+  const tradeLevel = val("blProduct")==="IRS" && rawTradeLevel > 1 ? rawTradeLevel/100 : rawTradeLevel;
+  const t = {
+    id: Date.now(),
+    product: val("blProduct"),
+    side: val("blSide"),
+    tenor: val("blTenor"),
+    notional: num("blNotional"),
+    tradeLevel: tradeLevel,
+    tradeSpot: num("blSpot")
+  };
+  blotter.push(t);
+  renderBlotter();
+}
+function seedDemoTrades(){
+  blotter = [
+    {id:1, product:"FXSW", side:"BUY", tenor:"1Y", notional:10000000, tradeLevel:-0.357, tradeSpot:32.097},
+    {id:2, product:"IRS", side:"SELL", tenor:"1Y", notional:10000000, tradeLevel:0.0317, tradeSpot:32.097},
+    {id:3, product:"CCS", side:"BUY", tenor:"2Y", notional:10000000, tradeLevel:0.0000, tradeSpot:32.097}
+  ];
+  renderBlotter();
+}
+function clearTrades(){
+  blotter = [];
+  renderBlotter();
+}
+function deleteTrade(id){
+  blotter = blotter.filter(x=>x.id!==id);
+  renderBlotter();
+}
+function tradeMtm(tr){
+  const spotDate = getSpotDate();
+  const end = addTenor(spotDate, tr.tenor);
+  const cur = getCurrentLevel(tr.product, tr.tenor);
+
+  if(tr.product==="FXSW"){
+    return {mtm: fxswapPnlTwd(tr.notional, tr.tradeLevel, cur.level, tr.side), ccy:"TWD"};
+  }
+  if(tr.product==="IRS"){
+    const mtm = irsNpv(tr.notional, tr.tradeLevel, cur.level, spotDate, end, val("usdBasis"), tr.side);
+    return {mtm, ccy:"USD"};
+  }
+  const basis = cur.level;
+  const usdCurve = getCurveMid(tr.tenor,"USD");
+  const twdCurve = getCurveMid(tr.tenor,"TWD");
+  const mtm = ccsNpv({
+    usdNotional: tr.notional,
+    spot: num("spot"),
+    start: spotDate,
+    end,
+    usdCurveRate: usdCurve,
+    twdCurveRate: twdCurve,
+    usdLegType: "FLOAT",
+    usdLegRate: 0,
+    twdLegType: "FLOAT",
+    twdLegRate: num("baseTwdRef")/100 + basis,
+    payFreq: 3,
+    usdBasis: val("usdBasis"),
+    twdBasis: val("twdBasis"),
+    reportCcy: "TWD",
+    side: tr.side
+  });
+  return {mtm, ccy:"TWD"};
+}
+function repriceBlotter(){
+  renderBlotter();
+}
+function renderBlotter(){
+  const body = document.getElementById("blotterBody");
+  body.innerHTML = "";
+  let fxTotal=0, irsTotal=0, ccsTotal=0;
+
+  blotter.forEach(tr=>{
+    const cur = getCurrentLevel(tr.product, tr.tenor);
+    const res = tradeMtm(tr);
+    if(tr.product==="FXSW") fxTotal += res.mtm;
+    if(tr.product==="IRS") irsTotal += res.mtm;
+    if(tr.product==="CCS") ccsTotal += res.mtm;
+
+    const row = document.createElement("tr");
+    const cls = res.mtm >= 0 ? "green" : "red";
+    row.innerHTML = `
+      <td>${tr.id}</td>
+      <td>${tr.product}</td>
+      <td><span class="pill ${tr.side==="BUY" ? "buy":"sell"}">${tr.side}</span></td>
+      <td>${tr.tenor}</td>
+      <td>${fmt2(tr.notional,2)}</td>
+      <td>${tr.product==="IRS" ? fmt(tr.tradeLevel*100,4)+"%" : fmt(tr.tradeLevel,6)}</td>
+      <td>${tr.product==="IRS" ? fmt(cur.level*100,4)+"%" : fmt(cur.level,6)}</td>
+      <td>${fmt(tr.tradeSpot,6)}</td>
+      <td>${fmt(num("spot"),6)}</td>
+      <td class="${cls}">${fmt2(res.mtm,2)}</td>
+      <td>${res.ccy}</td>
+      <td><button class="secondary" onclick="deleteTrade(${tr.id})">Delete</button></td>
+    `;
+    body.appendChild(row);
+  });
+
+  document.getElementById("blSum1").textContent = blotter.length;
+  document.getElementById("blSum2").textContent = fmt2(fxTotal,2);
+  document.getElementById("blSum3").textContent = fmt2(irsTotal,2);
+  document.getElementById("blSum4").textContent = fmt2(ccsTotal,2);
+}
+function calcRisk(){
+  const fxPnl = fxswapPnlTwd(num("riskFxNotional"), num("riskTradedPts"), num("riskMktPts"), "BUY");
+  const tenor = val("riskTenor");
+  const spotDate = getSpotDate();
+  const end = addTenor(spotDate, tenor);
+  const usdNotional = num("defaultNotional");
+  const spot = num("spot");
+  const baseUsd = getCurveMid(tenor,"USD");
+  const baseTwd = getCurveMid(tenor,"TWD");
+  const shockedUsd = baseUsd + num("riskUsdShock")/10000;
+  const shockedTwd = baseTwd + num("riskTwdShock")/10000;
+
+  const base = ccsNpv({
+    usdNotional, spot, start:spotDate, end,
+    usdCurveRate:baseUsd, twdCurveRate:baseTwd,
+    usdLegType:"FLOAT", usdLegRate:0,
+    twdLegType:"FLOAT", twdLegRate:0,
+    payFreq:3, usdBasis:val("usdBasis"), twdBasis:val("twdBasis"),
+    reportCcy:"TWD", side:"BUY"
+  });
+  const shocked = ccsNpv({
+    usdNotional, spot, start:spotDate, end,
+    usdCurveRate:shockedUsd, twdCurveRate:shockedTwd,
+    usdLegType:"FLOAT", usdLegRate:0,
+    twdLegType:"FLOAT", twdLegRate:0,
+    payFreq:3, usdBasis:val("usdBasis"), twdBasis:val("twdBasis"),
+    reportCcy:"TWD", side:"BUY"
+  });
+
+  document.getElementById("risk1").textContent = fmt2(fxPnl,2);
+  document.getElementById("risk2").textContent = fmt2(base,2);
+  document.getElementById("risk3").textContent = fmt2(shocked,2);
+  document.getElementById("risk4").textContent = fmt2(shocked-base,2);
+}
+
+setDefaultDate();
+populateTenors();
+setupTabs();
+initMarketGrid();
+recalcAll();
+calcFXSW();
+calcIRS();
+calcCCS();
+calcRisk();
+</script>
+</body>
+</html>
